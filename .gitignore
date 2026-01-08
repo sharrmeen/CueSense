@@ -26,9 +26,6 @@ mongodb-data/
 minio-data/
 *.minio
 
-celerybeat-schedule
-celerybeat.pid
-
 .env
 .env.*
 !.env.example
