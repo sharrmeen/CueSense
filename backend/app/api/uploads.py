@@ -2,9 +2,10 @@ import os
 import uuid
 import io
 from typing import List
-from fastapi import APIRouter, UploadFile, File, Query, HTTPException
+from fastapi import APIRouter, UploadFile, File, Query, HTTPException,BackgroundTasks
 from app.models.project import Project, ARoll, BRoll
-from app.utils.storage import client, BUCKET_A_ROLL, BUCKET_B_ROLL 
+from app.utils.storage import client, BUCKET_A_ROLL, BUCKET_B_ROLL
+from backend.app.services.transcriber import transcribe_video 
 
 router = APIRouter()
 
@@ -87,3 +88,37 @@ async def upload_multiple_b_rolls(
         "broll_ids": uploaded_ids,
         "total_clips": len(project.b_rolls)
     }
+    
+    
+@router.post("/{project_id}/process")
+async def start_processing(project_id: str, background_tasks: BackgroundTasks):
+    project = await Project.find_one(Project.project_id == project_id)
+    if not project or not project.a_roll:
+        raise HTTPException(status_code=400, detail="A-Roll missing")
+
+    # Update status immediately
+    project.status = "TRANSCRIBING"
+    await project.save()
+
+    # Trigger background task
+    background_tasks.add_task(run_transcription_pipeline, project_id)
+    
+    return {"message": "Transcription started"}
+
+async def run_transcription_pipeline(project_id: str):
+    """The background worker logic."""
+    project = await Project.find_one(Project.project_id == project_id)
+    
+    try:
+        
+        segments = await transcribe_video(project.a_roll.file_id)
+        
+        project.a_roll.transcript = segments
+        project.status = "TRANSCRIPTION_COMPLETE"
+        await project.save()
+        print(f"Project {project_id} transcribed successfully")
+        
+    except Exception as e:
+        project.status = "FAILED"
+        await project.save()
+        print(f"Transcription failed for {project_id}: {str(e)}")
