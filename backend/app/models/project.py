@@ -7,6 +7,7 @@ import uuid
 class ARoll(BaseModel):
     file_id: str
     path: str
+    duration:float
     transcript: Optional[List[dict]] = None 
 
 class BRoll(BaseModel):
