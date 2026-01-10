@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from app.api.uploads import router as project_router
 from beanie import init_beanie
 from app.models.project import Project
 from app.api import uploads
@@ -23,6 +24,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 #CORS
 app.add_middleware(
     CORSMiddleware,
@@ -33,8 +39,7 @@ app.add_middleware(
 )
 
 #include routers
-app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
-# app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
+app.include_router(project_router)
 
 @app.get("/")
 async def root():
