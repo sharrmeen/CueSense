@@ -26,6 +26,7 @@ class Project(Document):
     a_roll: Optional[ARoll] = None
     b_rolls: List[BRoll] = []
     edit_plan: List[dict] = []
+    final_video_path:str=""
     
     class Settings:
         name = "projects" 
