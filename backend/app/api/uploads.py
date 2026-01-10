@@ -4,11 +4,11 @@ import io
 import tempfile
 from typing import List
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from app.models.project import Project, ARoll, BRoll
-from app.utils.storage import client, BUCKET_A_ROLL, BUCKET_B_ROLL
+from app.utils.storage import BUCKET_OUTPUTS, client, BUCKET_A_ROLL, BUCKET_B_ROLL
 from app.utils.video import get_video_duration
-from app.workers.background import run_broll_analysis, run_matching_logic, run_render_task, run_transcription_pipeline 
+from app.workers.background import run_broll_analysis, run_matching_logic, run_transcription_pipeline, run_video_render 
 
 router = APIRouter()
 
@@ -170,23 +170,49 @@ async def start_rendering(project_id: str, background_tasks: BackgroundTasks):
     project.status = "RENDERING"
     await project.save()
 
-    background_tasks.add_task(run_render_task, project_id)
+    background_tasks.add_task(run_video_render, project_id)
     
     return {"message": "rendering started", "project_id": project_id}
 
 # allows the user to download the final rendered video file
+# @router.get("/{project_id}/download")
+# async def download_video(project_id: str):
+#     project = await Project.find_one(Project.project_id == project_id)
+    
+#     if not project or project.status != "COMPLETED":
+#         raise HTTPException(status_code=404, detail="video not ready or not found")
+
+#     if not os.path.exists(project.final_video_path):
+#         raise HTTPException(status_code=404, detail="file missing on server")
+
+#     return FileResponse(
+#         path=project.final_video_path, 
+#         filename=f"final_{project_id}.mp4",
+#         media_type="video/mp4"
+#     )
+
+
 @router.get("/{project_id}/download")
 async def download_video(project_id: str):
     project = await Project.find_one(Project.project_id == project_id)
     
-    if not project or project.status != "COMPLETED":
-        raise HTTPException(status_code=404, detail="video not ready or not found")
-
-    if not os.path.exists(project.final_video_path):
-        raise HTTPException(status_code=404, detail="file missing on server")
-
-    return FileResponse(
-        path=project.final_video_path, 
-        filename=f"final_{project_id}.mp4",
-        media_type="video/mp4"
+    url = client.presigned_get_object(
+        BUCKET_OUTPUTS, 
+        project.final_video_path,
+        response_headers={'response-content-type': 'video/mp4'}
     )
+    return RedirectResponse(url=url)
+
+
+@router.get("/list-projects")
+async def list_projects():
+    projects = await Project.find_all().to_list()
+    
+    return [
+        {
+            "name": p.name,
+            "project_id": p.project_id,
+            "edit_plan": p.edit_plan 
+        }
+        for p in projects
+    ]
