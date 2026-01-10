@@ -17,7 +17,7 @@ async def transcribe_video(file_id: str):
             temp_video.flush()
             
             #Run Local Transcription
-            segments, info = model.transcribe(temp_video.name, vad_filter=True)
+            segments, info = model.transcribe(temp_video.name,task="translate",vad_filter=True)
             
             #Format segments for our Matching Engine
             formatted_segments = [
