@@ -7,7 +7,7 @@ export default function Header({ projectId }) {
         <div className="bg-blue-600 p-2 rounded-lg">
           <Video className="w-6 h-6 text-white" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">b-roll.ai</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-600">CueSense</h1>
       </div>
       
       {projectId && (

@@ -4,6 +4,7 @@ import Header from './components/header';
 import ARollSection from './components/aRollSection';
 import BRollSection from './components/bRollSection';
 import StatusCard from './components/StatusCard';
+import LibraryPage from './components/ProjectHistory';
 import { useProjectStatus } from './hooks/useProjectStatus';
 
 const API_BASE = "http://localhost:8000";
@@ -11,10 +12,17 @@ const API_BASE = "http://localhost:8000";
 export default function App() {
   const [projectId, setProjectId] = useState(null);
   const [projectName, setProjectName] = useState('');
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [projects, setProjects] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   
   // Polling hook to track backend status and metadata
   const { status, metadata } = useProjectStatus(projectId);
+  const openLibrary = async () => {
+    const res = await axios.get(`${API_BASE}/list-projects`);
+    setProjects(res.data);
+    setShowLibrary(true);
+  };
 
   // Creates project using the name provided by the user
   const initProject = async () => {
@@ -72,10 +80,34 @@ export default function App() {
   // Final Step: Trigger the FFmpeg rendering stage
   const onRender = () => axios.post(`${API_BASE}/${projectId}/render`);
 
+    if (showLibrary) {
+      return (
+        <LibraryPage 
+          projects={projects} 
+          onBack={() => setShowLibrary(false)} 
+          onSelectProject={(id) => {
+            setProjectId(id);
+            setShowLibrary(false); 
+          }}
+        />
+      );
+    }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100">
       <div className="max-w-4xl mx-auto px-6 pb-20">
-        <Header projectId={projectId} />
+
+      <div className="flex justify-end pt-8">
+           <button 
+             onClick={openLibrary}
+             className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-indigo-500 transition-colors flex items-center gap-2"
+           >
+             <span className="w-2 h-2 bg-slate-200 rounded-full" />
+             View Project Library
+           </button>
+        </div>
+
+        <Header projectId={projectName} />
 
         {!projectId ? (
           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[40px] border-2 border-dashed border-slate-200 shadow-sm">
