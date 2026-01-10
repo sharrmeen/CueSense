@@ -7,8 +7,8 @@ from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Backgroun
 from fastapi.responses import FileResponse
 from app.models.project import Project, ARoll, BRoll
 from app.utils.storage import client, BUCKET_A_ROLL, BUCKET_B_ROLL
-from backend.app.utils.video import get_video_duration
-from backend.app.workers.background import run_full_analysis_and_matching, run_render_task, run_transcription_pipeline 
+from app.utils.video import get_video_duration
+from app.workers.background import run_broll_analysis, run_matching_logic, run_render_task, run_transcription_pipeline 
 
 router = APIRouter()
 
@@ -125,27 +125,36 @@ async def get_project_status(project_id: str):
     return {
         "project_id": project.project_id,
         "status": project.status,
+        "status_message": project.status_message,
         "a_roll_duration": project.a_roll.duration if project.a_roll else 0,
-        "b_roll_count": len(project.b_rolls)
+        "b_roll_count": len(project.b_rolls),
+        "edit_plan": project.edit_plan
     }
 
-# kicks off the gemini analysis of clips and the edit plan generation
+@router.post("/{project_id}/analyze-broll")
+async def analyze_broll_library(project_id: str, background_tasks: BackgroundTasks):
+    project = await Project.find_one(Project.project_id == project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Start the background analysis task
+    background_tasks.add_task(run_broll_analysis, project_id)
+    return {"message": "B-roll analysis started in background"}
+
 @router.post("/{project_id}/generate-edit-plan")
-async def start_matching_process(project_id: str, background_tasks: BackgroundTasks):
+async def create_edit_plan(project_id: str, background_tasks: BackgroundTasks):
+    """Triggers Step 2: Matching analyzed clips to the transcript."""
     project = await Project.find_one(Project.project_id == project_id)
     
-    if not project or project.status != "TRANSCRIPTION_COMPLETE":
-        raise HTTPException(status_code=400, detail="transcription must be complete first")
-
-    if not project.b_rolls:
-        raise HTTPException(status_code=400, detail="upload b-rolls first")
-
-    project.status = "ANALYZING_BROLLS"
-    await project.save()
-
-    background_tasks.add_task(run_full_analysis_and_matching, project_id)
+    # Strict Guard: Do not allow matching if analysis isn't done
+    if project.status != "BROLL_ANALYZED":
+        raise HTTPException(
+            status_code=400, 
+            detail="B-rolls must be analyzed before generating a plan."
+        )
     
-    return {"message": "analysis and matching started", "project_id": project_id}
+    background_tasks.add_task(run_matching_logic, project_id)
+    return {"message": "Timeline matching started in background"}
 
 # starts the ffmpeg rendering process once the edit plan is ready
 @router.post("/{project_id}/render")
