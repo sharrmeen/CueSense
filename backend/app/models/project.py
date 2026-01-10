@@ -14,15 +14,18 @@ class BRoll(BaseModel):
     broll_id: str
     path: str
     duration: float
-    description: Optional[str] = None 
+    description: Optional[str] = "No description available"
+    keywords: List[str] = []
+    mood: Optional[str] = "unknown"
 
 class Project(Document):
     project_id: Indexed(str, unique=True) = Field(default_factory=lambda: str(uuid.uuid4().hex[:6]).upper())
     name:str
-    status: str = "DRAFT"  # DRAFT, TRANSCRIBING, ANALYZING, COMPLETED
+    status: str = "DRAFT"
+    status_message: str = ""
     a_roll: Optional[ARoll] = None
     b_rolls: List[BRoll] = []
-    final_plan: Optional[dict] = None
-
+    edit_plan: List[dict] = []
+    
     class Settings:
         name = "projects" 
