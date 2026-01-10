@@ -1,9 +1,13 @@
 import os
-import json
-import google.generativeai as genai
-from app.utils.storage import client, BUCKET_B_ROLL
 import tempfile
 import time
+import json
+import asyncio
+import google.generativeai as genai
+from app.utils.storage import client, BUCKET_B_ROLL
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # setup gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -22,7 +26,7 @@ async def analyze_broll(broll_id: str):
 
             # wait for processing 
             while video_file.state.name == "PROCESSING":
-                time.sleep(2)
+                await asyncio.sleep(2)
                 video_file = genai.get_file(video_file.name)
 
             # strict prompt for structured output
