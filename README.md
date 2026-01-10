@@ -38,6 +38,15 @@ Each uploaded **B-roll** clip undergoes a comprehensive visual analysis to deter
   *(e.g., cooking, freshness, precision)* and persisted in **MongoDB** for fast retrieval during the matching and edit-planning phase.
 
 ---
+## Preview
+
+<img width="1280" height="800" alt="Screenshot 2026-01-11 at 3 45 11 AM" src="https://github.com/user-attachments/assets/930934b8-4d2c-4d87-ac8b-3da5c2f1357c" />
+<img width="1280" height="800" alt="Screenshot 2026-01-11 at 3 46 03 AM" src="https://github.com/user-attachments/assets/0bf2a68c-e134-4355-a8b2-aa0ef974649d" />
+<img width="1280" height="800" alt="Screenshot 2026-01-11 at 3 46 34 AM" src="https://github.com/user-attachments/assets/37185800-b054-45f9-bf7b-08ead58167de" />
+<img width="1280" height="800" alt="Screenshot 2026-01-11 at 3 46 43 AM" src="https://github.com/user-attachments/assets/9d932333-aad4-474e-92c9-eff1d9ca80fe" />
+<img width="1280" height="800" alt="Screenshot 2026-01-11 at 3 46 24 AM" src="https://github.com/user-attachments/assets/fcb117bd-89c1-4cf3-a1de-a4e3b23eb5e4" />
+
+---
 
 ## System Architecture & Infrastructure
 
@@ -135,7 +144,7 @@ docker-compose up -d
 ```
 
 ### 2. Environment Configuration
-#### Create a .env file in the backend root. You should use the provided .env.example as a template to ensure all required variables are present without exposing sensitive credentials in version control.
+#### Create a .env file in the backend root. You can use the provided .env.example as a template to ensure all required variables are present.
 
 
 ```
