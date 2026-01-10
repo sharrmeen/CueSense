@@ -1,10 +1,13 @@
-
-
+import os
+import secrets
+import subprocess
+import tempfile
 from app.models.project import Project
-from app.services.renderer import render_video
 from app.services.transcriber import transcribe_video
 from app.services.brollanalyzer import analyze_broll
 from app.services.matcher import generate_edit_plan
+from app.services.renderer import build_ffmpeg_command
+from app.utils.storage import client,BUCKET_A_ROLL, BUCKET_B_ROLL, BUCKET_OUTPUTS
 
 # background logic for a-roll transcription
 async def run_transcription_pipeline(project_id: str):
@@ -94,6 +97,7 @@ async def run_broll_analysis(project_id: str):
                 broll.description = analysis.get("description")
                 broll.keywords = analysis.get("keywords", [])
                 broll.mood = analysis.get("mood", "neutral")
+                project.b_rolls[i] = broll
                 await project.save()
                 print(f"DEBUG: Successfully analyzed {broll.broll_id}") 
             else:
@@ -117,17 +121,61 @@ async def run_matching_logic(project_id: str):
     await generate_edit_plan(project_id)
         
 
-# background logic for executing ffmpeg
-async def run_render_task(project_id: str):
+async def run_video_render(project_id: str):
+    project = await Project.find_one(Project.project_id == project_id)
+    if not project or not project.edit_plan:
+        return
+
     try:
-        output_path = await render_video(project_id)
-        if output_path:
-            print(f"render successful: {output_path}")
-        else:
-            print(f"render failed for {project_id}")
-    except Exception as e:
-        project = await Project.find_one(Project.project_id == project_id)
-        if project:
-            project.status = "FAILED"
+        project.status = "RENDERING"
+        project.status_message = "Preparing workspace..."
+        await project.save()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            #Download A-Roll
+            aroll_path = os.path.join(tmp_dir, "aroll.mp4")
+            aroll_data = client.get_object(BUCKET_A_ROLL, project.a_roll.file_id)
+            with open(aroll_path, "wb") as f:
+                f.write(aroll_data.read())
+
+            # Download B-Rolls used in plan
+            local_broll_paths = []
+            for i, edit in enumerate(project.edit_plan):
+                project.status_message = f"Downloading assets for clip {i+1}..."
+                await project.save()
+                
+                b_path = os.path.join(tmp_dir, f"b_{i}.mp4")
+                b_data = client.get_object(BUCKET_B_ROLL, edit["broll_id"])
+                with open(b_path, "wb") as f:
+                    f.write(b_data.read())
+                local_broll_paths.append(b_path)
+
+            #Execute Render
+            local_output = os.path.join(tmp_dir, "final_render.mp4")
+            project.status_message = "Executing FFmpeg render engine..."
             await project.save()
-        print(f"rendering error: {e}")
+
+            cmd = build_ffmpeg_command(aroll_path, local_broll_paths, project.edit_plan, local_output)
+            process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+            if process.returncode != 0:
+                raise Exception(f"FFmpeg failed: {process.stderr}")
+
+            #Upload Result to MinIO
+            project.status_message = "Uploading final video to cloud..."
+            await project.save()
+            random_suffix = secrets.token_hex(3)
+            minio_path = f"{project_id}/final_master_{random_suffix}.mp4"
+            with open(local_output, "rb") as f:
+                client.put_object(BUCKET_OUTPUTS, minio_path, f, os.path.getsize(local_output))
+
+            project.status = "COMPLETED"
+            project.status_message = "Render successful!"
+            project.final_video_path = minio_path 
+            await project.save()
+
+    except Exception as e:
+        print(f"Render Task Failed: {str(e)}")
+        project.status = "FAILED"
+        project.status_message = f"Render Error: {str(e)}"
+        await project.save()
